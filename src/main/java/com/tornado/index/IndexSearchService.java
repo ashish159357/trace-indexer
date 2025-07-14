@@ -1,4 +1,4 @@
-package com.tornado.service;
+package com.tornado.index;
 
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;

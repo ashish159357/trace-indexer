@@ -1,41 +1,79 @@
-package com.tornado.service;
+package com.tornado.index;
 
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import com.tornado.service.SingleIndexWriter;
+import com.tornado.service.TraceFieldExtractor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.store.FSDirectory;
+import java.util.Map;
 
-import java.io.IOException;
-import java.nio.file.Paths;
-
+@Slf4j
 public class IndexDataService {
 
-    private static final String INDEX_DIR = "traces-index";
+    private IndexDataService() {}
 
-    public static void indexTrace(String traceId, String spanId, String serviceName, String spanName, long startTime, long endTime, String attributes) {
+    public static void indexTraceData(Map<String, Object> fields) {
         try {
-            FSDirectory indexDirectory = FSDirectory.open(Paths.get(INDEX_DIR));
-            StandardAnalyzer analyzer = new StandardAnalyzer();
-            IndexWriterConfig config = new IndexWriterConfig(analyzer);
-            IndexWriter writer = new IndexWriter(indexDirectory, config);
+            IndexWriter writer = SingleIndexWriter.getIndexWriter();
 
             Document doc = new Document();
-            doc.add(new StringField("traceId", traceId, Field.Store.YES));
-            doc.add(new StringField("spanId", spanId, Field.Store.YES));
-            doc.add(new TextField("serviceName", serviceName, Field.Store.YES));
-            doc.add(new TextField("spanName", spanName, Field.Store.YES));
-            doc.add(new LongPoint("startTime", startTime));
-            doc.add(new LongPoint("endTime", endTime));
-            doc.add(new StoredField("attributes", attributes));
+
+            // Add all extracted fields based on their type
+            for (Map.Entry<String, Object> entry : fields.entrySet()) {
+                String fieldName = entry.getKey();
+                Object value = entry.getValue();
+
+                if (TraceFieldExtractor.getSpanFields().containsKey(fieldName))
+                {
+                    if (value instanceof String v) {
+                        // Determine a field type based on name convention or explicit type info
+                        if (fieldName.endsWith("Id")) {
+                            doc.add(new StringField(fieldName, v, TraceFieldExtractor.getSpanFields().get(fieldName).shouldStore() ? Field.Store.YES : Field.Store.NO));
+                        } else {
+                            doc.add(new TextField(fieldName, v, TraceFieldExtractor.getSpanFields().get(fieldName).shouldStore() ? Field.Store.YES : Field.Store.NO));
+                        }
+                    } else if (value instanceof Long v) {
+                        doc.add(new LongPoint(fieldName, v));
+
+                        if (TraceFieldExtractor.getSpanFields().get(fieldName).shouldStore()) {
+                            doc.add(new StoredField(fieldName, v));
+                        }
+                    } else if (value instanceof Integer v) {
+                        doc.add(new IntPoint(fieldName, v));
+                        if (TraceFieldExtractor.getSpanFields().get(fieldName).shouldStore()) {
+                            doc.add(new StoredField(fieldName, v));
+                        }
+                    }
+                }else if(TraceFieldExtractor.getResourceFields().containsKey(fieldName)) {
+                    if (value instanceof String v) {
+                        // Determine a field type based on name convention or explicit type info
+                        if (fieldName.endsWith("Id")) {
+                            doc.add(new StringField(fieldName, v, TraceFieldExtractor.getResourceFields().get(fieldName).shouldStore() ? Field.Store.YES : Field.Store.NO));
+                        } else {
+                            doc.add(new TextField(fieldName, v, TraceFieldExtractor.getResourceFields().get(fieldName).shouldStore() ? Field.Store.YES : Field.Store.NO));
+                        }
+                    } else if (value instanceof Long v) {
+                        doc.add(new LongPoint(fieldName, v));
+
+                        if (TraceFieldExtractor.getResourceFields().get(fieldName).shouldStore()) {
+                            doc.add(new StoredField(fieldName, v));
+                        }
+                    } else if (value instanceof Integer v) {
+                        doc.add(new IntPoint(fieldName, v));
+                        if (TraceFieldExtractor.getResourceFields().get(fieldName).shouldStore()) {
+                            doc.add(new StoredField(fieldName, v));
+                        }
+                    }
+                }else {
+                    log.warn("don't have any field named {} in FieldExtractor. So, not adding this field for indexing...", fieldName);
+                }
+            }
 
             writer.addDocument(doc);
-            writer.close();
+            writer.commit();
 
-            System.out.println("✅ Indexed Trace: " + traceId + " | Span: " + spanName);
-
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Exception exception) {
+            log.error("unable to index data : {}", exception.getMessage());
         }
     }
 }
