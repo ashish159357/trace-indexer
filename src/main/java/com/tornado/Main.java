@@ -25,7 +25,6 @@ public class Main {
     // GRpcServerRunner.java
     public static class GRpcServerRunner implements CommandLineRunner {
         private final int port;
-        private Server server;
 
         public GRpcServerRunner(int port) {
             this.port = port;
@@ -33,7 +32,7 @@ public class Main {
 
         @Override
         public void run(String... args) throws Exception {
-            server = ServerBuilder.forPort(port)
+            Server server = ServerBuilder.forPort(port)
                     .addService(new TraceServiceImpl())
                     .build()
                     .start();

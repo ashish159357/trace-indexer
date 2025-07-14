@@ -1,5 +1,7 @@
 package com.tornado.index;
 
+import com.tornado.service.SingleIndexReader;
+import com.tornado.service.SingleIndexWriter;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.LongPoint;
@@ -21,9 +23,7 @@ public class IndexSearchService {
     private static final String INDEX_DIR = "traces-index";
 
     public List<Document> searchTraces(String queryString, String field) throws IOException, ParseException {
-        FSDirectory directory = FSDirectory.open(Paths.get(INDEX_DIR));
-        DirectoryReader reader = DirectoryReader.open(directory);
-        IndexSearcher searcher = new IndexSearcher(reader);
+        IndexSearcher searcher = new IndexSearcher(SingleIndexReader.getIndexReader());
         StandardAnalyzer analyzer = new StandardAnalyzer();
 
         QueryParser parser = new QueryParser(field, analyzer);
@@ -36,7 +36,6 @@ public class IndexSearchService {
             documents.add(searcher.doc(scoreDoc.doc));
         }
 
-        reader.close();
         return documents;
     }
 
